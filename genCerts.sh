@@ -5,69 +5,19 @@
 ##################################################################################
 ## CA ##
 #genCA=true to implement
-CAFILE="ca-chain.pem"
-DEST="gen-lab"
-
-DAYS_SERVER_CERTS=365
-DAYS_CLIENT_CERTS=365
-
-
+. conf.sh
 ## INFOS ## 
-C="IT" # country code
-ST="Italy" # state
-L="Milan"  # lieu
-O="MongoDB" # company name
-
-ou_member="MongoDB-Server" #organization unit for mongod processes
-ou_client="MongoDB-Client" #organization unit for client (drivers, agents)
 
 ## LIST OF THE CLIENTS IN NEED OF A CERTIFICATE
 # mongodb_client_hosts=( "mongodb-node1" "mongodb-node2" "mongodb-node3" "ilians-macbook" )
 
 ## SERVER LIST FOR CERTIFICATE GENERATION
 ## The configuration is JSON based in order to manage subject alternative names in a dynamic way, modify it accordingly to your needs
-server_hosts_conf='{
-        "servers":[
-            {
-                "server" : "lab1",
-                "DNS.1" : "lab1.523b.net"
-            },
-            {
-                "server" : "lab2",
-                "DNS.1" : "lab2.523b.net"
-            },
-            {
-                "server" : "lab3",
-                "DNS.1" : "lab3.523b.net"
-            }
-        ]
-    }'
-# server_hosts_conf='{
-#         "servers":[
-#             {
-#                 "server" : "mongo1",
-#                 "DNS.1" : "mongo1.523b.net"
-#             },
-#             {
-#                 "server" : "mongo2",
-#                 "DNS.1" : "mongo2.523b.net"
-#             },
-#             {
-#                 "server" : "mongo3",
-#                 "DNS.1" : "mongo3.523b.net"
-#             },
-#             {
-#                 "server" : "opsmanager",
-#                 "DNS.1" : "opsmanager.523b.net"
-#             }
-#         ]
-#     }'
-
-
 
 ##################################################################################
-mkdir ${DEST}
-cd ${DEST}
+mkdir ${DEST_CRT}
+cp hosts ${DEST_CRT}/
+cd ${DEST_CRT}
 
 
 
@@ -77,15 +27,14 @@ echo "##### STEP 2: Create server certificates"
 # Now create & sign keys for each mongod server 
 # Pay attention to the OU part of the subject in "openssl req" command
 # You may want to use FQDNs instead of short hostname
-mongodb_server_hosts=( $(jq -r '.servers[].server' <<< "$server_hosts_conf") )
-mongodb_server_altNamesDNS1=( $(jq -r '.servers[]."DNS.1"' <<< "$server_hosts_conf") )
 
-length=${#mongodb_server_hosts[@]}
-for (( idx = 0; idx < length; idx++ )); do
-    echo "######################################################################################"
-	host=${mongodb_server_hosts[$idx]}
-	echo "Generating certificate for server $host"
-	cat > "csr_details_${host}.cfg" <<-EOF
+
+while read p; do
+  host=$(echo "$p")
+  alt=$(echo "${p%%.*}")
+  echo "######################################################################################"
+  echo "Generating certificate for server $host"
+  cat > "csr_details_${host}.cfg" <<-EOF
 		[req]
 		default_bits = 2048
 		prompt = no
@@ -110,11 +59,9 @@ for (( idx = 0; idx < length; idx++ )); do
 		subjectAltName=@alt_names
 
 		[ alt_names ]
-		DNS.1 = ${mongodb_server_altNamesDNS1[$idx]}
-		DNS.2 = ${mongodb_server_hosts[$idx]}
+		DNS.1 = ${alt}
+		DNS.2 = ${host}
 	EOF
-
-	
     # Create the key file mongodb-test-server1.key.
     openssl genrsa -out ${host}.server.key 4096
 
@@ -126,4 +73,9 @@ for (( idx = 0; idx < length; idx++ )); do
 
     # combine all together
     cat ${host}.server.crt ${host}.server.key > ${host}.server.pem
-done  
+
+    mkdir ../$DEST_OUT/$alt
+    cp ../$DEST_OUT/$CAFILE ../$DEST_OUT/$alt
+    cp  ${host}.server.pem ../$DEST_OUT/$alt/server.pem
+
+done < hosts

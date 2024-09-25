@@ -3,28 +3,13 @@
 # this script will create a CA, server and client certificates
 # do not use this in production environments!
 ##################################################################################
-## CA ##
-#genCA=true to implement
-CAFILE="ca-chain.pem"
-CA_NAME="ILIANS-ROOT-CA"
-DEST="ca2"
-DAYS_ROOT_CA=1826
-DAYS_INTERMEDIATE_CA=730
-DAYS_SERVER_CERTS=365
-DAYS_CLIENT_CERTS=365
 
-## INFOS ## 
-C="IT" # country code
-ST="Italy" # state
-L="Milan"  # lieu
-O="MongoDB" # company name
-
-dn_prefix="/C=$C/ST=$ST/L=$L/O=$O"
-
+. conf.sh
 
 
 ##################################################################################
 mkdir ${DEST}
+mkdir  ${DEST_OUT}
 cd ${DEST}
 
 echo "######################################################################################"
@@ -52,7 +37,7 @@ distinguished_name = req_dn
 subjectKeyIdentifier  = hash
 basicConstraints = CA:FALSE
 keyUsage = critical, digitalSignature, keyEncipherment
-nsComment = "OpenSSL Generated Certificate for TESTING only.  NOT FOR PRODUCTION USE."
+nsComment = "OpenSSL Generated Certificate"
 extendedKeyUsage  = serverAuth, clientAuth
 
 [ v3_ca ]
@@ -65,7 +50,7 @@ C=${C}
 ST=${ST}
 L=${L}
 O=${O}
-OU=MONGODB-CA
+OU=${OU}
 EOF
 
 # ca key
@@ -86,4 +71,6 @@ openssl x509 -sha256 -req -days $DAYS_INTERMEDIATE_CA -in mongodb-ia.csr -CA mon
 # Create the CA PEM file
 cat mongodb-ca.crt mongodb-ia.crt  > $CAFILE
 
+cp $CAFILE ../$DEST_OUT/$CAFILE
+cd ..
 
